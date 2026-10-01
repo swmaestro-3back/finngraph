@@ -1,0 +1,7 @@
+services:
+  ai:
+    depends_on:
+      db:
+        condition: service_healthy
+      neo4j-init:
+        condition: service_completed_successfully
