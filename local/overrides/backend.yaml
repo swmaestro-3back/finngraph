@@ -1,0 +1,9 @@
+services:
+  backend:
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+      app-db-migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy

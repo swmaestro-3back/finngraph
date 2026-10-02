@@ -1,0 +1,28 @@
+services:
+  airflow-init:
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+      neo4j-init:
+        condition: service_completed_successfully
+
+  airflow-apiserver:
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+      neo4j-init:
+        condition: service_completed_successfully
+
+  airflow-scheduler:
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+      neo4j-init:
+        condition: service_completed_successfully
+
+  airflow-dag-processor:
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+      neo4j-init:
+        condition: service_completed_successfully

@@ -1,0 +1,16 @@
+name: finngraph-local
+
+include:
+  - infra.yaml
+  - path:
+      - ${ETL_DIR:-../../finngraph-etl}/compose.yaml
+      - overrides/etl.yaml
+  - path:
+      - ${BACKEND_DIR:-../../finngraph-backend-api-server}/compose.yaml
+      - overrides/backend.yaml
+  - path:
+      - ${AI_DIR:-../../finngraph-ai-server}/compose.yaml
+      - overrides/ai.yaml
+  - path:
+      - ${GATEWAY_DIR:-../../finngraph-api-gateway-GO}/compose.yaml
+      - overrides/gateway.yaml

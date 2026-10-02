@@ -1,0 +1,9 @@
+services:
+  gateway:
+    depends_on:
+      backend:
+        condition: service_started
+      ai:
+        condition: service_started
+      redis:
+        condition: service_started
