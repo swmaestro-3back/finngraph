@@ -5,5 +5,5 @@ services:
         condition: service_started
       ai:
         condition: service_started
-      gw-redis:
+      redis:
         condition: service_started

@@ -1,7 +1,10 @@
 name: finngraph-local
 
 include:
-  - ${ETL_DIR:-../../finngraph-etl}/compose.yaml
+  - infra.yaml
+  - path:
+      - ${ETL_DIR:-../../finngraph-etl}/compose.yaml
+      - overrides/etl.yaml
   - path:
       - ${BACKEND_DIR:-../../finngraph-backend-api-server}/compose.yaml
       - overrides/backend.yaml

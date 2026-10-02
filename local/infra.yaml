@@ -1,0 +1,129 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${ETL_DB_USER:-threeback}
+      POSTGRES_PASSWORD: ${ETL_DB_PASSWORD:-12345678}
+      POSTGRES_DB: ${ETL_DB_NAME:-finngraph}
+    ports:
+      - "${ETL_DB_PORT:-15432}:5432"
+    volumes:
+      - etl_pgdata:/var/lib/postgresql/data
+      - ${ETL_DIR:-../../finngraph-etl}/docker/db/initdb/001_extensions.sql:/docker-entrypoint-initdb.d/001_extensions.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${ETL_DB_USER:-threeback} -d ${ETL_DB_NAME:-finngraph}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  db-migrate:
+    image: flyway/flyway:12.11.0
+    command: ["migrate"]
+    environment:
+      FLYWAY_URL: jdbc:postgresql://db:5432/${ETL_DB_NAME:-finngraph}
+      FLYWAY_USER: ${ETL_DB_USER:-threeback}
+      FLYWAY_PASSWORD: ${ETL_DB_PASSWORD:-12345678}
+      FLYWAY_LOCATIONS: filesystem:/flyway/sql
+    volumes:
+      - ${ETL_DIR:-../../finngraph-etl}/migrations/versions:/flyway/sql:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  app-db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: finngraph_app
+      POSTGRES_USER: ${APP_DB_USER:-finngraph_app}
+      POSTGRES_PASSWORD: ${APP_DB_PASSWORD:-app}
+      TZ: Asia/Seoul
+    ports:
+      - "127.0.0.1:15433:5432"
+    volumes:
+      - app-db-data:/var/lib/postgresql/data
+      - ${BACKEND_DIR:-../../finngraph-backend-api-server}/docker/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U ${APP_DB_USER:-finngraph_app} -d finngraph_app"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  app-db-migrate:
+    image: flyway/flyway:12.11.0
+    command: ["migrate"]
+    environment:
+      FLYWAY_URL: jdbc:postgresql://app-db:5432/finngraph_app
+      FLYWAY_USER: ${APP_DB_USER:-finngraph_app}
+      FLYWAY_PASSWORD: ${APP_DB_PASSWORD:-app}
+      FLYWAY_LOCATIONS: filesystem:/flyway/sql
+      TZ: Asia/Seoul
+    volumes:
+      - ${BACKEND_DIR:-../../finngraph-backend-api-server}/db/migration-app:/flyway/sql:ro
+    depends_on:
+      app-db:
+        condition: service_healthy
+    restart: "no"
+
+  neo4j:
+    image: neo4j:5
+    environment:
+      NEO4J_AUTH: "${NEO4J_USERNAME:?NEO4J_USERNAME 을 .env 에 설정하세요}/${NEO4J_PASSWORD:?NEO4J_PASSWORD 를 .env 에 설정하세요}"
+      NEO4J_initial_dbms_default__database: "${NEO4J_DATABASE:?NEO4J_DATABASE 를 .env 에 설정하세요}"
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - etl_neo4j_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u ${NEO4J_USERNAME:?} -p ${NEO4J_PASSWORD:?} 'RETURN 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  neo4j-init:
+    image: neo4j:5
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    environment:
+      NEO4J_USERNAME: ${NEO4J_USERNAME:?NEO4J_USERNAME 을 .env 에 설정하세요}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:?NEO4J_PASSWORD 를 .env 에 설정하세요}
+      NEO4J_DATABASE: ${NEO4J_DATABASE:?NEO4J_DATABASE 를 .env 에 설정하세요}
+    volumes:
+      - ${ETL_DIR:-../../finngraph-etl}/migrations/neo4j:/migrations:ro
+    entrypoint:
+      - bash
+      - -c
+      - |
+        set -e
+        for migration in /migrations/*.cypher; do
+          echo "running migration $$migration"
+          cypher-shell -a bolt://neo4j:7687 \
+            -u "$$NEO4J_USERNAME" -p "$$NEO4J_PASSWORD" -d "$$NEO4J_DATABASE" \
+            -f "$$migration"
+        done
+    restart: "no"
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    environment:
+      TZ: Asia/Seoul
+    ports:
+      - "127.0.0.1:16379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  app-db-data:
+  etl_pgdata:
+  etl_neo4j_data:
+  redis-data:
